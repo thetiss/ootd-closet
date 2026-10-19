@@ -13,7 +13,6 @@ interface OpenMeteoDailyResponse {
     time: string[];
     temperature_2m_max: number[];
     temperature_2m_min: number[];
-    temperature_2m_apparent_max: number[];
     precipitation_sum: number[];
     wind_speed_10m_max: number[];
     weather_code: number[];
@@ -28,23 +27,30 @@ export async function fetchWeekWeather(
   const url = new URL('https://api.open-meteo.com/v1/forecast');
   url.searchParams.set('latitude', String(lat));
   url.searchParams.set('longitude', String(lon));
+  // 注意：只使用 Open-Meteo 实际支持的 daily 变量；temperature_2m_apparent_* 不是合法字段
   const dailyParams =
-    'temperature_2m_max,temperature_2m_min,temperature_2m_apparent_max,precipitation_sum,wind_speed_10m_max,weather_code';
+    'temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code';
   url.searchParams.set('daily', dailyParams);
   url.searchParams.set('timezone', 'Asia/Shanghai');
   url.searchParams.set('forecast_days', '7');
 
   const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Weather API failed: ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Weather API ${res.status}: ${text.slice(0, 120)}`);
+  }
   const data = (await res.json()) as OpenMeteoDailyResponse;
 
   const days: WeatherDay[] = [];
   for (let i = 0; i < data.daily.time.length; i++) {
+    const tMax = data.daily.temperature_2m_max[i];
+    const tMin = data.daily.temperature_2m_min[i];
     days.push({
       date: data.daily.time[i],
-      tempMax: data.daily.temperature_2m_max[i],
-      tempMin: data.daily.temperature_2m_min[i],
-      tempFeels: data.daily.temperature_2m_apparent_max[i],
+      tempMax: tMax,
+      tempMin: tMin,
+      // 温感温度用最高温兜底（apparent 字段非合法 daily 变量）
+      tempFeels: tMax,
       weatherCode: data.daily.weather_code[i],
       precipitation: data.daily.precipitation_sum[i],
       windSpeed: data.daily.wind_speed_10m_max[i],
