@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef1f7"/>
+      <stop offset="1" stop-color="#dde3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+  <rect x="8" y="8" width="496" height="496" rx="104" ry="104" fill="none" stroke="#2c3652" stroke-opacity="0.18" stroke-width="2"/>
+  <g transform="translate(256 264)" fill="none" stroke="#2b3a63" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M -96 -70 L -72 -96 L 72 -96 L 96 -70 L 132 20 L 82 40 L 82 130 L -82 130 L -82 40 L -132 20 Z"/>
+    <path d="M -40 -96 C -40 -50 -20 -34 0 -34 C 20 -34 40 -50 40 -96" stroke="#4a6a9c"/>
+  </g>
+  <text x="256" y="466" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-size="42" font-weight="700" fill="#2b3a63" letter-spacing="6">OOTD</text>
+</svg>

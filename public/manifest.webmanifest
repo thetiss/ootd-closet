@@ -1,0 +1,27 @@
+{
+  "name": "OOTD · 电子衣柜",
+  "short_name": "OOTD Closet",
+  "description": "拍照即可管理衣橱 · 每日穿搭推荐 · 周计划",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef1f7",
+  "theme_color": "#eef1f7",
+  "categories": ["lifestyle", "shopping"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
