@@ -1,6 +1,6 @@
 import type { WeatherDay } from '@/types';
 
-const CACHE_KEY = 'ootd.weatherCache';
+const CACHE_PREFIX = 'ootd.weatherCache.v2:';
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 小时
 
 interface CachedWeather {
@@ -53,33 +53,53 @@ export async function fetchWeekWeather(
   return days;
 }
 
-export async function fetchWeekWeatherCached(
-  lat: number,
-  lon: number,
-  forceRefresh = false,
-): Promise<{ days: WeatherDay[]; fromCache: boolean }> {
-  const cache = readCache();
-  if (!forceRefresh && cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
-    return { days: cache.days, fromCache: true };
-  }
-  const days = await fetchWeekWeather(lat, lon);
-  writeCache({ days, fetchedAt: Date.now() });
-  return { days, fromCache: false };
+// Cache 按坐标分片（避免切换城市后仍读到旧城市数据）
+function cacheKeyFor(lat: number, lon: number): string {
+  return `${CACHE_PREFIX}${lat.toFixed(3)},${lon.toFixed(3)}`;
 }
 
-function readCache(): CachedWeather | null {
+function readCache(lat: number, lon: number): CachedWeather | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKeyFor(lat, lon));
     return raw ? (JSON.parse(raw) as CachedWeather) : null;
   } catch {
     return null;
   }
 }
 
-function writeCache(payload: CachedWeather): void {
-  localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+function writeCache(lat: number, lon: number, payload: CachedWeather): void {
+  localStorage.setItem(cacheKeyFor(lat, lon), JSON.stringify(payload));
+}
+
+export async function fetchWeekWeatherCached(
+  lat: number,
+  lon: number,
+  forceRefresh = false,
+): Promise<{ days: WeatherDay[]; fromCache: boolean; stale: boolean }> {
+  const cache = readCache(lat, lon);
+  if (!forceRefresh && cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
+    return { days: cache.days, fromCache: true, stale: false };
+  }
+  try {
+    const days = await fetchWeekWeather(lat, lon);
+    writeCache(lat, lon, { days, fetchedAt: Date.now() });
+    return { days, fromCache: false, stale: false };
+  } catch (err) {
+    // 网络/API 失败时回退到旧缓存（即使过期），保证 UI 有数据
+    if (cache && cache.days.length > 0) {
+      return { days: cache.days, fromCache: true, stale: true };
+    }
+    throw err;
+  }
 }
 
 export function clearWeatherCache(): void {
-  localStorage.removeItem(CACHE_KEY);
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(CACHE_PREFIX)) keys.push(k);
+  }
+  keys.forEach((k) => localStorage.removeItem(k));
+  // 兼容旧 key（v1）
+  localStorage.removeItem('ootd.weatherCache');
 }

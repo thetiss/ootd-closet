@@ -13,7 +13,7 @@ import { useRecommendationStore } from '@/stores/recommendation';
 import { useLooksStore } from '@/stores/looks';
 import WeekWeatherStrip from '@/components/weather/WeekWeatherStrip.vue';
 import DayCard from '@/components/recommendation/DayCard.vue';
-import { CATEGORY_LABELS, weatherMeta } from '@/utils/constants';
+import { CATEGORY_LABELS } from '@/utils/constants';
 import dayjs from 'dayjs';
 import type { Category, SceneTag } from '@/types';
 
@@ -65,17 +65,6 @@ const weatherErrorText = computed(() => {
 });
 
 const sceneChips = computed(() => settingsStore.allScenes.slice(0, 5));
-const todayWeather = computed(() => weatherStore.today);
-const todayScene = computed<SceneTag | null>(() => {
-  if (!todayWeather.value) return null;
-  const iso = todayWeather.value.date;
-  const plan = weekPlan.value.find((p) => p.date === iso);
-  return plan?.scene ?? null;
-});
-const todayWeatherMeta = computed(() => {
-  if (!todayWeather.value) return null;
-  return weatherMeta(todayWeather.value.weatherCode);
-});
 
 // ── Toast ─────────────────────────────────────────────────────────────
 const toast = ref<{ msg: string; ts: number } | null>(null);
@@ -219,15 +208,20 @@ onMounted(async () => {
         </div>
       </header>
 
-      <!-- TODAY HERO WEATHER -->
+      <!-- WEEK STRIP (合并今日 + 未来 7 天) -->
       <section class="mt-5">
         <div class="mb-3 flex items-baseline justify-between px-1">
-          <h2 class="display text-lg">今日天气</h2>
+          <h2 class="display text-lg">未来 7 天</h2>
           <button
             class="text-xs ink-mute tracking-wider font-mono hover:text-ink transition-colors"
             @click="weatherStore.refresh(true)"
+            :disabled="weatherStore.loading"
+            :aria-busy="weatherStore.loading"
             aria-label="刷新天气"
-          >↻ 刷新</button>
+          >
+            <span v-if="weatherStore.loading" class="animate-pulse">刷新中…</span>
+            <span v-else>↻ 刷新</span>
+          </button>
         </div>
         <p v-if="geoStatusText" class="mb-2 px-1 text-xs ink-mute">
           <span aria-hidden="true">⚠</span> {{ geoStatusText }}
@@ -235,30 +229,6 @@ onMounted(async () => {
         <p v-if="weatherErrorText" class="mb-2 px-1 text-xs ink-mute">
           <span aria-hidden="true">⚠</span> {{ weatherErrorText }}
         </p>
-
-        <div v-if="todayWeather && todayWeatherMeta" class="neu-out glass grid grid-cols-2 gap-4 p-4 md:grid-cols-4">
-          <div class="flex items-center gap-2 col-span-2 md:col-span-1">
-            <span aria-hidden="true" class="text-5xl">{{ todayWeatherMeta.icon }}</span>
-            <div>
-              <p class="display text-3xl leading-none">{{ todayWeather.tempMax }}°</p>
-              <p class="text-xs ink-mute font-mono">/ {{ todayWeather.tempMin }}°</p>
-            </div>
-          </div>
-          <div class="col-span-2 md:col-span-2 md:justify-self-end">
-            <p class="text-xs uppercase tracking-widest ink-mute mb-1">今日场景</p>
-            <div class="flex flex-wrap gap-1.5">
-              <span v-if="todayScene" class="chip-active">#{{ todayScene }}</span>
-              <span v-else class="chip">—</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- WEEK STRIP -->
-      <section class="mt-5">
-        <div class="mb-3 flex items-baseline justify-between px-1">
-          <h2 class="display text-lg">未来 7 天</h2>
-        </div>
         <WeekWeatherStrip />
       </section>
 

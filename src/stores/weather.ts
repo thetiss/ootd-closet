@@ -18,6 +18,8 @@ export const useWeatherStore = defineStore('weather', () => {
   const lastFetchedAt = ref<number | null>(null);
   // 手动覆盖某日气温（date → temp）
   const manualOverrides = ref<Record<string, number>>({});
+  // 防止并发 refresh
+  let inflightRefresh: Promise<void> | null = null;
 
   const today = computed<WeatherDay | null>(() => {
     const t = new Date();
@@ -27,14 +29,16 @@ export const useWeatherStore = defineStore('weather', () => {
 
   async function initLocation() {
     const settingsStore = useSettingsStore();
-    // 1. 从 settings 加载已保存的 city
+    // 1. 从 settings 加载已保存的 city（默认上海）
     await settingsStore.load();
     city.value = { ...settingsStore.settings.city };
 
-    // 2. 尝试浏览器定位
+    // 2. 立即用当前 city 拉天气（默认上海），不阻塞用户
+    void refresh();
+
+    // 3. 浏览器支持定位才尝试升级城市；不支持 / 拒绝都保留当前 city
     if (!('geolocation' in navigator)) {
       geoState.value = 'unsupported';
-      await refresh();
       return;
     }
     geoState.value = 'unknown';
@@ -51,38 +55,40 @@ export const useWeatherStore = defineStore('weather', () => {
         if (newCity.lat !== city.value.lat || newCity.lon !== city.value.lon) {
           city.value = newCity;
           await settingsStore.saveSettings({ city: newCity });
-          geoState.value = 'granted';
-          await refresh();
-        } else {
-          geoState.value = 'granted';
-          await refresh();
         }
+        geoState.value = 'granted';
+        await refresh();
       },
       () => {
         geoState.value = 'denied';
-        void refresh();
+        // 保持 city 为默认/用户上次保存的城市，不主动刷（refresh 已在步骤 2 触发）
       },
       { timeout: 5000, maximumAge: 60 * 60 * 1000 },
     );
   }
 
   async function refresh(forceRefresh = false) {
+    if (inflightRefresh) return inflightRefresh;
     loading.value = true;
-    error.value = null;
-    try {
-      const { days: fetched, fromCache } = await fetchWeekWeatherCached(
-        city.value.lat,
-        city.value.lon,
-        forceRefresh,
-      );
-      days.value = fetched;
-      lastFetchedAt.value = Date.now();
-      void fromCache;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : '天气获取失败';
-    } finally {
-      loading.value = false;
-    }
+    inflightRefresh = (async () => {
+      try {
+        const { days: fetched } = await fetchWeekWeatherCached(
+          city.value.lat,
+          city.value.lon,
+          forceRefresh,
+        );
+        days.value = fetched;
+        lastFetchedAt.value = Date.now();
+        // 有新数据了，清掉错误提示
+        if (fetched.length > 0) error.value = null;
+      } catch (err) {
+        error.value = err instanceof Error ? err.message : '天气获取失败';
+      } finally {
+        loading.value = false;
+        inflightRefresh = null;
+      }
+    })();
+    return inflightRefresh;
   }
 
   async function setCity(newCity: CityInfo) {

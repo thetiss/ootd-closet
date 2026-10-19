@@ -64,8 +64,7 @@ async function saveCity() {
     return;
   }
   const name = cityName.value.trim() || '自定义城市';
-  await settingsStore.saveSettings({ city: { lat, lon, name } });
-  weatherStore.refresh(true);
+  await weatherStore.setCity({ lat, lon, name });
   showToast('城市已保存');
 }
 
