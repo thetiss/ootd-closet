@@ -123,6 +123,62 @@ export async function compositeOutfitImage(
   });
 }
 
+/**
+ * 把 4 件套合成一张"扁平铺陈"效果图（1:1，无分隔线、无标签），
+ * 用于每日穿搭预览卡等需要"一张成套图"的场景。
+ * 布局：top 上半 · bottom 下半 · shoes_bags 右下角 · accessory 右上角小叠。
+ * 空槽静默跳过，不画占位。
+ */
+export async function composeOutfitFlat(
+  slots: CompositeSlot[],
+  opts: { size?: number; quality?: number } = {},
+): Promise<Blob> {
+  const size = opts.size ?? 560;
+  const quality = opts.quality ?? 0.8;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Cannot get canvas 2d context');
+
+  ctx.fillStyle = '#F5F1E8';
+  ctx.fillRect(0, 0, size, size);
+
+  const regionFor = (i: number): [number, number, number, number] => {
+    switch (i) {
+      case 0: return [0, 0, size, size * 0.55];             // top
+      case 1: return [0, size * 0.45, size, size * 0.55];  // bottom
+      case 2: return [size * 0.32, size * 0.6, size * 0.68, size * 0.4];  // shoes_bags
+      case 3: return [size * 0.66, size * 0.02, size * 0.32, size * 0.3]; // accessory
+      default: return [0, 0, 0, 0];
+    }
+  };
+
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i];
+    if (!s.blob) continue;
+    const [x, y, w, h] = regionFor(i);
+    if (w <= 0 || h <= 0) continue;
+    const url = URL.createObjectURL(s.blob);
+    try {
+      const img = await loadImageElement(url);
+      drawImageCover(ctx, img, x, y, w, h);
+    } catch {
+      // 静默跳过
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Canvas toBlob failed'))),
+      'image/jpeg',
+      quality,
+    );
+  });
+}
+
 function loadImageElement(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();

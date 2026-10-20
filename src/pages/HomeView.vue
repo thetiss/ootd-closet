@@ -13,6 +13,7 @@ import { useRecommendationStore } from '@/stores/recommendation';
 import { useLooksStore } from '@/stores/looks';
 import WeekWeatherStrip from '@/components/weather/WeekWeatherStrip.vue';
 import DayCard from '@/components/recommendation/DayCard.vue';
+import DayPreviewCard from '@/components/recommendation/DayPreviewCard.vue';
 import { CATEGORY_LABELS } from '@/utils/constants';
 import dayjs from 'dayjs';
 import type { Category, SceneTag } from '@/types';
@@ -109,6 +110,9 @@ function goUpload() { router.push('/wardrobe/upload'); }
 
 const showEmptyCta = computed(() => itemsStore.items.length === 0);
 const showNotTodayCta = computed(() => weekPlan.value.length === 0 && !generating.value);
+
+// 展开详情：null = 收起；number = 展开第 N 天
+const expandedDay = ref<number | null>(null);
 
 // ── Look strip ────────────────────────────────────────────────────────
 const recentLooks = computed(() => looksStore.recLooks.slice(0, 8));
@@ -293,19 +297,45 @@ onMounted(async () => {
             <span aria-hidden="true">⚠</span>
             本周缺{{ missingLabelsList().join('、') }}
           </p>
-          <DayCard
-            v-for="(p, i) in weekPlan"
-            :key="p.date"
-            :plan="p"
-            :index="i"
-            @regenerate="onRegenerate"
-            @wear="onWear"
-            @change-scene="onSceneChange"
-            @replace-item="onReplace"
-            @save-look="onSaveLook"
-            @go-to-upload="onGoUpload"
-            @go-to-wardrobe="onGoWardrobe"
-          />
+
+          <!-- 横向滑动 strip：一张卡片 = 一天的一套推荐 + 场景标签 -->
+          <div
+            class="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2 no-scrollbar"
+            aria-label="本周推荐横向滚动"
+          >
+            <DayPreviewCard
+              v-for="(p, i) in weekPlan"
+              :key="p.date"
+              :plan="p"
+              :items="itemsStore.items"
+              :index="i"
+              @preview-day="expandedDay = i"
+            />
+          </div>
+
+          <!-- 展开的完整 DayCard（点击预览卡片后显示） -->
+          <div v-if="expandedDay != null && weekPlan[expandedDay]">
+            <div class="mb-2 flex items-center justify-between px-1">
+              <p class="text-xs ink-mute tracking-wider font-mono">
+                详情 · 第 {{ expandedDay + 1 }} 天
+              </p>
+              <button
+                class="text-xs ink-mute hover:text-ink"
+                @click="expandedDay = null"
+              >✕ 收起</button>
+            </div>
+            <DayCard
+              :plan="weekPlan[expandedDay]"
+              :index="expandedDay"
+              @regenerate="onRegenerate"
+              @wear="onWear"
+              @change-scene="onSceneChange"
+              @replace-item="onReplace"
+              @save-look="onSaveLook"
+              @go-to-upload="onGoUpload"
+              @go-to-wardrobe="onGoWardrobe"
+            />
+          </div>
         </template>
       </section>
 
