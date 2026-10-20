@@ -22,6 +22,7 @@ const sourceFilter = ref<SourceFilter>('all');
 const sceneFilter = ref<string | null>(null);
 
 const editorOpen = ref(false);
+const editorInitial = ref<Partial<Look> | null>(null);
 const toast = ref<{ msg: string; ts: number } | null>(null);
 
 const sceneOptions = computed(() => settingsStore.allScenes);
@@ -44,7 +45,8 @@ function showToast(msg: string) {
   toast.value = { msg, ts: Date.now() };
 }
 
-function openEditor() {
+function openEditor(look?: Look) {
+  editorInitial.value = look ?? null;
   editorOpen.value = true;
 }
 
@@ -52,10 +54,19 @@ function closeEditor() {
   editorOpen.value = false;
 }
 
+async function onSaved() {
+  showToast('Look 已保存');
+  await looksStore.refresh();
+}
+
 async function onDelete(look: Look) {
   if (!confirm('确定要删除这条 Look 吗？')) return;
   await looksStore.deleteLook(look.id);
   showToast('Look 已删除');
+}
+
+function onEdit(look: Look) {
+  openEditor(look);
 }
 
 onMounted(async () => {
@@ -95,19 +106,29 @@ onMounted(async () => {
         style="background: radial-gradient(circle, color-mix(in oklch, var(--color-primary) 70%, transparent), transparent 68%);"
       />
       <div class="relative">
-        <p class="font-mono text-xs uppercase tracking-widest ink-mute">Lookbook</p>
-        <h1 class="display mt-1 text-3xl">
-          穿搭<span class="text-accent">收藏夹</span>
-        </h1>
-        <div class="mt-3 flex items-center justify-between">
-          <p class="text-sm ink-mute">
-            共 <span class="font-mono font-semibold text-ink">{{ looks.length }}</span> 条
-            <span class="font-mono">·</span>
-            推荐 <span class="font-mono font-semibold text-ink">{{ recCount }}</span>
-            <span class="font-mono">·</span>
-            手动 <span class="font-mono font-semibold text-ink">{{ manualCount }}</span>
-          </p>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="font-mono text-xs uppercase tracking-widest ink-mute">Lookbook</p>
+            <h1 class="display mt-1 text-3xl">
+              穿搭<span class="text-accent">收藏夹</span>
+            </h1>
+          </div>
+          <button
+            class="btn btn-primary !rounded-full !px-3 !py-2 text-sm"
+            aria-label="新建 Look"
+            @click="openEditor()"
+          >
+            <span class="text-lg leading-none" aria-hidden="true">＋</span>
+            <span>新建</span>
+          </button>
         </div>
+        <p class="mt-3 text-sm ink-mute">
+          共 <span class="font-mono font-semibold text-ink">{{ looks.length }}</span> 条
+          <span class="font-mono">·</span>
+          推荐 <span class="font-mono font-semibold text-ink">{{ recCount }}</span>
+          <span class="font-mono">·</span>
+          手动 <span class="font-mono font-semibold text-ink">{{ manualCount }}</span>
+        </p>
       </div>
     </header>
 
@@ -191,7 +212,7 @@ onMounted(async () => {
         <p class="mt-1.5 text-sm ink-mute">手动创建一条，或在首页推荐中点"收藏"。</p>
         <button
           class="btn btn-primary mt-5 !rounded-full !px-5 !py-2.5"
-          @click="openEditor"
+          @click="openEditor()"
         >
           <span aria-hidden="true">＋</span>
           <span>新建 Look</span>
@@ -214,18 +235,21 @@ onMounted(async () => {
           :key="look.id"
           :look="look"
           :items="items"
+          show-edit
           show-delete
+          @edit="onEdit"
           @delete="onDelete"
         />
       </div>
     </div>
 
-    <!-- Floating new button -->
+    <!-- Floating new button (仅空状态隐藏；有内容时靠底部 Nav 上方) -->
     <button
-      class="btn btn-primary fixed bottom-24 right-4 z-30 !rounded-full !p-4 !px-0 !py-0"
-      style="width: 56px; height: 56px;"
+      v-if="looks.length > 0"
+      class="btn btn-primary fixed bottom-28 right-4 z-30 !rounded-full !p-4 !px-0 !py-0"
+      style="width: 52px; height: 52px;"
       aria-label="新建 Look"
-      @click="openEditor"
+      @click="openEditor()"
     >
       <span class="text-xl leading-none" aria-hidden="true">＋</span>
     </button>
@@ -233,8 +257,9 @@ onMounted(async () => {
     <!-- Editor bottom sheet -->
     <LookEditor
       :open="editorOpen"
+      :initial="editorInitial"
       @close="closeEditor"
-      @saved="() => showToast('Look 已保存')"
+      @saved="onSaved"
     />
   </div>
 </template>

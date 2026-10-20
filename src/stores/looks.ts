@@ -44,12 +44,17 @@ export const useLooksStore = defineStore('looks', () => {
     looks.value = looks.value.filter((l) => l.id !== id);
   }
 
-  async function updateLook(id: string, patch: Partial<Omit<Look, 'id' | 'userId'>>): Promise<void> {
-    const idx = looks.value.findIndex((l) => l.id === id);
-    if (idx < 0) return;
-    const updated: Look = { ...looks.value[idx], ...patch };
-    looks.value[idx] = updated;
+  async function updateLook(
+    id: string,
+    patch: Partial<Omit<Look, 'id' | 'userId' | 'createdAt'>>,
+  ): Promise<Look> {
+    const existing = looks.value.find((l) => l.id === id);
+    if (!existing) throw new Error('Look 不存在或已删除');
+    const updated: Look = { ...existing, ...patch, id: existing.id, userId: existing.userId, createdAt: existing.createdAt };
     await db.looks.put(updated);
+    const idx = looks.value.findIndex((l) => l.id === id);
+    if (idx >= 0) looks.value[idx] = updated;
+    return updated;
   }
 
   return {

@@ -33,6 +33,10 @@ export interface Look {
   scene: SceneTag | null;
   tempBand: number | null;
   items: { category: Category; itemId: string | null }[];
+  // 效果图 / 整套照（可选）：LookCard 优先展示它
+  sourcePhoto?: Blob;
+  // 图片来源类型：composed = 从衣柜 4 件套合成；photo = 用户上传整套照
+  sourceKind?: 'composed' | 'photo';
   createdAt: number;
   source: 'recommendation' | 'manual';
 }

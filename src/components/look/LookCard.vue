@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* Hallmark · component: look-card · Look 收藏夹主卡片
  * states: default · has-deleted-item · source: recommendation | manual
+ * variants: has-source-photo（优先展示效果图/整套照） · grid-only（4 件套网格）
+ * sourceKind: composed = 4 件套合成 2x2 效果图（1:1） · photo = 用户上传整套照（4:5）
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Item, Look } from '@/types';
@@ -10,14 +12,17 @@ const props = defineProps<{
   look: Look;
   items: Item[];
   showDelete?: boolean;
+  showEdit?: boolean;
 }>();
 
 const emit = defineEmits<{
   delete: [look: Look];
+  edit: [look: Look];
 }>();
 
 const urlHandles = ref<string[]>([]);
 const thumbUrls = ref<Record<string, string>>({});
+const sourcePhotoUrl = ref<string>('');
 
 const itemsById = computed(() => {
   const m = new Map<string, Item>();
@@ -25,11 +30,28 @@ const itemsById = computed(() => {
   return m;
 });
 
+// 4 件套任一槽有 item，就算"有单品"
+const hasAnySlot = computed(() =>
+  props.look.items.some((s) => s.itemId && itemsById.value.has(s.itemId)),
+);
+
 function buildUrls() {
+  // 清理上一轮
   for (const h of urlHandles.value) URL.revokeObjectURL(h);
   urlHandles.value = [];
+
   const next: Record<string, string> = {};
   const handles: string[] = [];
+
+  // 整套照（仅当 Look 保存了 sourcePhoto 时展示）
+  let src = '';
+  if (props.look.sourcePhoto) {
+    src = URL.createObjectURL(props.look.sourcePhoto);
+    handles.push(src);
+  }
+  sourcePhotoUrl.value = src;
+
+  // 4 件套缩略图
   for (const slot of props.look.items) {
     if (!slot.itemId) continue;
     const it = itemsById.value.get(slot.itemId);
@@ -44,6 +66,7 @@ function buildUrls() {
 
 onMounted(buildUrls);
 watch(() => props.look.items, buildUrls);
+watch(() => props.look.sourcePhoto, buildUrls);
 watch(() => props.items, buildUrls);
 onBeforeUnmount(() => {
   for (const h of urlHandles.value) URL.revokeObjectURL(h);
@@ -73,6 +96,10 @@ function formatDate(ms: number): string {
 function onDelete() {
   emit('delete', props.look);
 }
+
+function onEdit() {
+  emit('edit', props.look);
+}
 </script>
 
 <template>
@@ -89,6 +116,12 @@ function onDelete() {
         <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] ink-mute">
           <span class="chip !px-1.5 !py-0 !text-[9px]">{{ sourceLabel }}</span>
           <span
+            v-if="look.sourcePhoto"
+            class="chip !px-1.5 !py-0 !text-[9px]"
+          >
+            {{ look.sourceKind === 'photo' ? '整套照' : '效果图' }}
+          </span>
+          <span
             v-if="look.scene"
             class="chip !px-1.5 !py-0 !text-[9px]"
           >
@@ -101,16 +134,41 @@ function onDelete() {
           <span class="font-mono">{{ formatDate(look.createdAt) }}</span>
         </div>
       </div>
-      <button
-        v-if="showDelete"
-        class="glass-hairline flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs transition-opacity"
-        aria-label="删除 Look"
-        @click="onDelete"
-      >✕</button>
+      <div class="flex shrink-0 items-center gap-1">
+        <button
+          v-if="showEdit"
+          class="glass-hairline flex h-7 w-7 items-center justify-center rounded-full text-xs transition-opacity"
+          aria-label="编辑 Look"
+          @click="onEdit"
+        >✎</button>
+        <button
+          v-if="showDelete"
+          class="glass-hairline flex h-7 w-7 items-center justify-center rounded-full text-xs transition-opacity"
+          aria-label="删除 Look"
+          @click="onDelete"
+        >✕</button>
+      </div>
     </header>
 
-    <!-- Grid of 4 slots -->
-    <div class="grid grid-cols-4 gap-2">
+    <!-- Variant A: 效果图 / 整套照 -->
+    <div
+      v-if="look.sourcePhoto"
+      class="neu-in-soft relative overflow-hidden rounded-xl"
+      :style="look.sourceKind === 'photo' ? 'aspect-ratio: 4 / 5; max-height: 360px;' : 'aspect-ratio: 1 / 1; max-height: 340px;'"
+    >
+      <img
+        :src="sourcePhotoUrl"
+        :alt="look.sourceKind === 'photo' ? '整套搭配照片' : '4 件套搭配效果图'"
+        class="h-full w-full object-cover"
+      />
+      <span
+        class="absolute left-2 top-2 glass-hairline rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold"
+        style="background: color-mix(in oklch, var(--color-ink) 78%, transparent);"
+      >{{ look.sourceKind === 'photo' ? '整套' : '合成' }}</span>
+    </div>
+
+    <!-- Variant B: 4 件套网格（仅在无整套照时展示） -->
+    <div v-else-if="hasAnySlot" class="grid grid-cols-4 gap-2">
       <div
         v-for="cat in CATEGORY_ORDER"
         :key="cat"
